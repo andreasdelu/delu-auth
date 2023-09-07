@@ -22,12 +22,12 @@ let CONFIG = {
 
 /**
  * Initializes the auth module
- * @param {string} jwtSecret - String
  * @param {object} config - Object
  * @returns true if successful
  * @example
  * //Default config
  * const config = {
+ * 	jwtSecret: null, // JWT secret
  * 	tokenExpiration: 8 * 60 * 60, // 8 hours in seconds
  * 	noAuthRedirectPath: "/login", // Redirect path if user is not authenticated
  * 	passwordSaltRounds: 10, // bcrypt salt rounds
@@ -247,28 +247,41 @@ async function hashPassword(password) {
 
 /**
  * Authenticates a password
+ * If authentication is successful, a JWT token is signed and set as a cookie and a 200 response is sent
+ * If the onSuccess hook is provided with a return, it will be called instead of sending a response (useful for redirecting);
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
  * @param {string} password - String
  * @param {string} hashedPassword - String
  * @param {object} tokenContent - Object
  * @param {object} hooks - Object **Optional**
- * @returns {string} A JWT token
+ * @returns {object} Express response object
  * @example
- * const token = await authenticate("password", "hashedPassword", { id: 1 },
+ * app.post("/login", async (req, res) => {
+ * 	const { password } = req.body;
+ *
+ * 	const hashedPassword = await getHashedPasswordFromDB(); // Get hashed password from database
+ *
+ * 	const tokenContent = { id: 1 };
+ *
+ * 	await authenticate(req, res, password, hashedPassword, tokenContent,
  * 	{
  * 		beforeAuthenticate: () => {
  * 			// Do something before authenticating
  * 			return true; // Return false to abort the authentication process
  * 		},
- * 		onSuccess: (token) => {
- * 			// Do something on success
+ * 		onSuccess: (token, res) => {
+ * 			// Do something on success (redirect, etc.)
  * 		},
  * 		onFailure: (error) => {
  * 			// Do something on failure
  * 		},
- * 	}
- * );
+ * 	});
+ * });
  */
 async function authenticate(
+	req,
+	res,
 	password,
 	hashedPassword,
 	tokenContent,
@@ -278,10 +291,12 @@ async function authenticate(
 		if (hooks && typeof hooks !== "object") {
 			throw new Error("Invalid hooks");
 		}
-		const { beforeAuthenticate, onSuccess } = hooks;
 		// Before authenticate hook
-		if (beforeAuthenticate && typeof beforeAuthenticate === "function") {
-			const shouldContinue = beforeAuthenticate(); // can return false to abort the authentication process
+		if (
+			hooks?.beforeAuthenticate &&
+			typeof hooks?.beforeAuthenticate === "function"
+		) {
+			const shouldContinue = hooks?.beforeAuthenticate(); // can return false to abort the authentication process
 			if (typeof shouldContinue === "boolean" && !shouldContinue) {
 				console.log("Authentication aborted by beforeAuthenticate hook");
 				return null;
@@ -321,20 +336,29 @@ async function authenticate(
 			throw new Error("Could not sign JWT");
 		}
 
+		// Set the authentication cookie
+		res.cookie(CONFIG.tokenCookieName, sessionToken, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			maxAge: CONFIG.tokenExpiration * 1000,
+		});
+
 		// On success hook
-		if (onSuccess && typeof onSuccess === "function") {
-			onSuccess(sessionToken);
+		if (hooks?.onSuccess && typeof hooks?.onSuccess === "function") {
+			const userResponse = hooks?.onSuccess(sessionToken, req, res);
+			if (userResponse) {
+				return;
+			}
 		}
 
-		return sessionToken;
+		return res.status(200).json({ message: "Authentication successful" });
 	} catch (error) {
 		console.log("COULD NOT AUTHENTICATE: ", error);
-		const { onFailure } = hooks;
 		// On failure hook
-		if (onFailure && typeof onFailure === "function") {
-			onFailure(error);
+		if (hooks?.onFailure && typeof hooks?.onFailure === "function") {
+			hooks?.onFailure(error);
 		}
-		return null;
+		return res.status(500).json({ error: error.message });
 	}
 }
 
