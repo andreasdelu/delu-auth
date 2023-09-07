@@ -1,4 +1,5 @@
 # DeluAuth
+
 ### A simple authentication package for Node and Express
 
 This authentication package provides a set of utilities for handling user authentication in Node.js applications using Express. It includes functions for hashing passwords, verifying passwords, signing JWT tokens, verifying JWT tokens, and middleware to ensure authentication.
@@ -14,7 +15,7 @@ npm install delu-auth
 Before using any of the package's functionalities, you need to initialize it:
 
 ```javascript
-const auth = require('delu-auth');
+const auth = require("delu-auth");
 const jwtSecret = process.env.JWT_SECRET;
 
 auth.init(jwtSecret);
@@ -27,7 +28,7 @@ auth.init(jwtSecret);
 This package provides a utility function to generate a cryptographically secure JWT secret. To generate a secret:
 
 ```javascript
-const { generateJWTSecret } = require('delu-auth');
+const { generateJWTSecret } = require("delu-auth");
 const secret = generateJWTSecret();
 console.log(secret);
 ```
@@ -41,7 +42,7 @@ console.log(secret);
 To hash a password:
 
 ```javascript
-const hashedPassword = await auth.hashPassword('yourPassword');
+const hashedPassword = await auth.hashPassword("yourPassword");
 ```
 
 ### Authenticating Users
@@ -49,7 +50,33 @@ const hashedPassword = await auth.hashPassword('yourPassword');
 To authenticate a user and get a JWT token:
 
 ```javascript
-const token = await auth.authenticate('password', 'hashedPassword', { userId: 123 });
+const token = await auth.authenticate("password", "hashedPassword", {
+	userId: 123,
+});
+```
+
+### Authenticating Users WITH HOOKS
+
+To authenticate a user using hooks:
+
+```javascript
+await auth.authenticate(
+	"password",
+	"hashedPassword",
+	{ userId: 123 },
+	{
+		beforeAuthenticate: () => {
+			// Do something before authenticating
+			return true; // Return false to abort the authentication process
+		},
+		onSuccess: (token) => {
+			// Do something on success
+		},
+		onFailure: (error) => {
+			// Do something on failure
+		},
+	}
+);
 ```
 
 ### Verifying JWT Tokens
@@ -57,7 +84,7 @@ const token = await auth.authenticate('password', 'hashedPassword', { userId: 12
 To verify a JWT token:
 
 ```javascript
-const decoded = auth.verifyJWT('yourToken');
+const decoded = auth.verifyJWT("yourToken");
 ```
 
 ### Middleware for Authentication
@@ -65,8 +92,8 @@ const decoded = auth.verifyJWT('yourToken');
 To ensure a route is accessed only by authenticated users:
 
 ```javascript
-app.get('/protected', auth.ensureAuth, (req, res) => {
-    // Your route logic here
+app.get("/protected", auth.ensureAuth, (req, res) => {
+	// Your route logic here
 });
 ```
 
@@ -78,11 +105,11 @@ You can provide additional configuration when initializing:
 
 ```javascript
 auth.init(jwtSecret, {
-    tokenCookieName: 'myToken', // Name of the cookie containing the JWT token
-    passwordSaltRounds: 10, // Number of salt rounds used in bcrypt hashing
-    tokenExpiration: 8 * 60 * 60, // Token expiration in seconds
-    tokenAudience: "", // Token audience
-    tokenIssuer: "", // Token issuer
+	tokenCookieName: "myToken", // Name of the cookie containing the JWT token
+	passwordSaltRounds: 10, // Number of salt rounds used in bcrypt hashing
+	tokenExpiration: 8 * 60 * 60, // Token expiration in seconds
+	tokenAudience: "", // Token audience
+	tokenIssuer: "", // Token issuer
 });
 ```
 
