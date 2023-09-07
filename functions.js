@@ -181,17 +181,19 @@ async function hashPassword(password) {
  * @param {object} hooks - Object **Optional**
  * @returns {string} A JWT token
  * @example
- * const token = await authenticate("password", "hashedPassword", { id: 1 }, {
- * 	beforeAuthenticate: () => {
- * 		// Do something before authenticating
- * 		return true; // Return false to abort the authentication process
- * 	},
- * 	onSuccess: (token) => {
- * 		// Do something on success
- * 	},
- * 	onFailure: (error) => {
- * 		// Do something on failure
- * 	},
+ * const token = await authenticate("password", "hashedPassword", { id: 1 },
+ * 	{
+ * 		beforeAuthenticate: () => {
+ * 			// Do something before authenticating
+ * 			return true; // Return false to abort the authentication process
+ * 		},
+ * 		onSuccess: (token) => {
+ * 			// Do something on success
+ * 		},
+ * 		onFailure: (error) => {
+ * 			// Do something on failure
+ * 		},
+ * 	}
  * );
  */
 async function authenticate(
