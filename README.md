@@ -1,6 +1,5 @@
-# delu-auth
-
-# Authentication Package for Node and Express
+# DeluAuth
+### A simple authentication package for Node and Express
 
 This authentication package provides a set of utilities for handling user authentication in Node.js applications using Express. It includes functions for hashing passwords, verifying passwords, signing JWT tokens, verifying JWT tokens, and middleware to ensure authentication.
 
