@@ -1,10 +1,9 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-//GLOBAL VARIABLES
-let JWT_SECRET = null;
-
 let CONFIG = {
+	jwtSecret: null,
+	noAuthRedirectPath: "/login",
 	passwordRequirements: {
 		enabled: false,
 		minLength: 8,
@@ -30,6 +29,7 @@ let CONFIG = {
  * //Default config
  * const config = {
  * 	tokenExpiration: 8 * 60 * 60, // 8 hours in seconds
+ * 	noAuthRedirectPath: "/login", // Redirect path if user is not authenticated
  * 	passwordSaltRounds: 10, // bcrypt salt rounds
  * 	tokenAudience: "", // JWT audience
  * 	tokenIssuer: "", // JWT issuer
@@ -45,19 +45,25 @@ let CONFIG = {
  * 	},
  * };
  */
-function init(jwtSecret, config) {
-	if (!jwtSecret) {
-		throw new Error("Missing JWT Secret");
-	}
-	if (JWT_SECRET !== null) {
+function init(config) {
+	if (CONFIG.jwtSecret !== null) {
 		throw new Error("Already initialized");
-	}
-	if (typeof jwtSecret !== "string" || jwtSecret.length !== 32) {
-		throw new Error("Invalid JWT Secret");
 	}
 	if (config) {
 		if (typeof config !== "object") {
 			throw new Error("Invalid config");
+		}
+		if (config.jwtSecret) {
+			if (typeof config.jwtSecret !== "string") {
+				throw new Error("Invalid jwtSecret");
+			}
+			CONFIG.jwtSecret = config.jwtSecret;
+		}
+		if (config.defaultRedirectPath) {
+			if (typeof config.defaultRedirectPath !== "string") {
+				throw new Error("Invalid defaultRedirectPath");
+			}
+			CONFIG.defaultRedirectPath = config.defaultRedirectPath;
 		}
 		if (config.tokenExpiration) {
 			if (typeof config.tokenExpiration !== "number") {
@@ -146,9 +152,75 @@ function init(jwtSecret, config) {
 		}
 	}
 
-	JWT_SECRET = jwtSecret;
-
 	return true;
+}
+
+/**
+ * Checks if password passes the password requirements set in the config
+ * @param {string} password - String
+ * @returns {boolean} True if the password is valid
+ * @example
+ * const valid = await verifyPassword("Password123!");
+ * console.log(valid); //true
+ * @example
+ * const valid = await verifyPassword("password");
+ * console.log(valid); //false
+ */
+function isStrongPassword(password) {
+	try {
+		if (!password) {
+			throw new Error("Missing password");
+		}
+		if (typeof password !== "string") {
+			throw new Error("Invalid password");
+		}
+		if (CONFIG.passwordRequirements.enabled) {
+			if (password.length < CONFIG.passwordRequirements.minLength) {
+				throw new Error(
+					`Password must be at least ${CONFIG.passwordRequirements.minLength} characters long`
+				);
+			}
+			if (password.length > CONFIG.passwordRequirements.maxLength) {
+				throw new Error(
+					`Password must be at most ${CONFIG.passwordRequirements.maxLength} characters long`
+				);
+			}
+			if (CONFIG.passwordRequirements.requireUppercase) {
+				if (!/[A-Z]/.test(password)) {
+					throw new Error(
+						"Password must contain at least one uppercase letter"
+					);
+				}
+			}
+			if (CONFIG.passwordRequirements.requireLowercase) {
+				if (!/[a-z]/.test(password)) {
+					throw new Error(
+						"Password must contain at least one lowercase letter"
+					);
+				}
+			}
+			if (CONFIG.passwordRequirements.requireNumbers) {
+				if (!/[0-9]/.test(password)) {
+					throw new Error("Password must contain at least one number");
+				}
+			}
+			if (CONFIG.passwordRequirements.requireSpecialCharacters) {
+				if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+					throw new Error(
+						"Password must contain at least one special character"
+					);
+				}
+			}
+		} else {
+			throw new Error(
+				"Password requirements are disabled, enable them in the config"
+			);
+		}
+		return true;
+	} catch (error) {
+		console.log("COULD NOT VERIFY PASSWORD: ", error);
+		return false;
+	}
 }
 
 /**
@@ -285,14 +357,17 @@ function signJWT(tokenContent) {
 		if (Object.keys(tokenContent).length === 0) {
 			throw new Error("Invalid tokenContent");
 		}
-		if (!JWT_SECRET) {
+		if (!CONFIG.jwtSecret) {
 			throw new Error("No JWT Secret");
 		}
-		if (typeof JWT_SECRET !== "string" || JWT_SECRET.length !== 32) {
+		if (
+			typeof CONFIG.jwtSecret !== "string" ||
+			CONFIG.jwtSecret.length !== 32
+		) {
 			throw new Error("Invalid JWT Secret");
 		}
 
-		const secret = JWT_SECRET;
+		const secret = CONFIG.jwtSecret;
 
 		const token = jwt.sign(tokenContent, secret, {
 			expiresIn: CONFIG.tokenExpiration,
@@ -327,13 +402,16 @@ function verifyJWT(token) {
 		if (typeof token !== "string") {
 			throw new Error("Invalid token");
 		}
-		if (!JWT_SECRET) {
+		if (!CONFIG.jwtSecret) {
 			throw new Error("No JWT Secret");
 		}
-		if (typeof JWT_SECRET !== "string" || JWT_SECRET.length !== 32) {
+		if (
+			typeof CONFIG.jwtSecret !== "string" ||
+			CONFIG.jwtSecret.length !== 32
+		) {
 			throw new Error("Invalid JWT Secret");
 		}
-		const secret = JWT_SECRET;
+		const secret = CONFIG.jwtSecret;
 		const verified = jwt.verify(token, secret);
 		return verified;
 	} catch (error) {
@@ -359,6 +437,7 @@ function verifyJWT(token) {
 function ensureAuth(req, res, next) {
 	try {
 		let token;
+		let authorized = false;
 
 		// Check for token in cookies
 		if (req?.cookies?.[CONFIG.tokenCookieName]) {
@@ -372,14 +451,29 @@ function ensureAuth(req, res, next) {
 		}
 
 		if (!token) {
-			return res.status(401).json({ error: "No token found" });
+			/* return res.status(401).json({ error: "No token found" }); */
+			authorized = false;
 		}
 
 		const verified = verifyJWT(token);
 		if (!verified) {
-			return res.status(401).json({ error: "Token signature mismatch" });
+			/* return res.status(401).json({ error: "Token signature mismatch" }); */
+			authorized = false;
 		}
 		req.user = verified;
+		authorized = true;
+
+		if (!authorized) {
+			// If it's an API request
+			if (req.headers.accept === "application/json") {
+				return res.status(401).json({ error: "Not authenticated" });
+			}
+
+			// For web requests, redirect
+			const redirectPath = CONFIG.noAuthRedirectPath;
+			return res.redirect(redirectPath);
+		}
+
 		next();
 	} catch (error) {
 		console.log("COULD NOT ENSURE AUTH: ", error);
@@ -387,10 +481,24 @@ function ensureAuth(req, res, next) {
 	}
 }
 
-function endSession(req, res) {
+/**
+ * Logs out a user by clearing the token cookie
+ * OPTIONAL: Add a redirectPath query parameter to redirect the user after logging out
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ * @returns {object} Express response object
+ * @example
+ * app.post("/logout", auth.logout);
+ */
+function logout(req, res) {
 	try {
 		res.clearCookie(CONFIG.tokenCookieName);
-	} catch (error) {}
+		const redirectPath = req.query.redirectPath || CONFIG.defaultRedirectPath;
+		return res.redirect(redirectPath);
+	} catch (error) {
+		console.log("COULD NOT LOGOUT: ", error);
+		return res.status(500).json({ error: error.message });
+	}
 }
 
 module.exports = {
@@ -400,4 +508,6 @@ module.exports = {
 	ensureAuth,
 	signJWT,
 	verifyJWT,
+	isStrongPassword,
+	logout,
 };

@@ -5,6 +5,8 @@ const {
 	signJWT,
 	verifyJWT,
 	hashPassword,
+	isStrongPassword,
+	logout,
 } = require("./functions");
 const { generateJWTSecret } = require("./utils");
 
@@ -16,4 +18,6 @@ module.exports = {
 	init,
 	signJWT,
 	verifyJWT,
+	isStrongPassword,
+	logout,
 };
