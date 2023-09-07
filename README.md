@@ -13,7 +13,7 @@ npm install delu-auth
 
 Before using any of the package's functionalities, you need to initialize it:
 
-```
+```javascript
 const auth = require('delu-auth');
 const jwtSecret = process.env.JWT_SECRET;
 
@@ -26,7 +26,7 @@ auth.init(jwtSecret);
 
 This package provides a utility function to generate a cryptographically secure JWT secret. To generate a secret:
 
-```
+```javascript
 const { generateJWTSecret } = require('delu-auth');
 const secret = generateJWTSecret();
 console.log(secret);
@@ -40,7 +40,7 @@ console.log(secret);
 
 To hash a password:
 
-```
+```javascript
 const hashedPassword = await auth.hashPassword('yourPassword');
 ```
 
@@ -48,7 +48,7 @@ const hashedPassword = await auth.hashPassword('yourPassword');
 
 To authenticate a user and get a JWT token:
 
-```
+```javascript
 const token = await auth.authenticate('password', 'hashedPassword', { userId: 123 });
 ```
 
@@ -56,7 +56,7 @@ const token = await auth.authenticate('password', 'hashedPassword', { userId: 12
 
 To verify a JWT token:
 
-```
+```javascript
 const decoded = auth.verifyJWT('yourToken');
 ```
 
@@ -64,7 +64,7 @@ const decoded = auth.verifyJWT('yourToken');
 
 To ensure a route is accessed only by authenticated users:
 
-```
+```javascript
 app.get('/protected', auth.ensureAuth, (req, res) => {
     // Your route logic here
 });
@@ -76,10 +76,13 @@ The middleware will check for a token in a cookie (by default named "token") or 
 
 You can provide additional configuration when initializing:
 
-```
+```javascript
 auth.init(jwtSecret, {
     tokenCookieName: 'myToken', // Name of the cookie containing the JWT token
-    // ... other configurations
+    passwordSaltRounds: 10, // Number of salt rounds used in bcrypt hashing
+    tokenExpiration: 8 * 60 * 60, // Token expiration in seconds
+    tokenAudience: "", // Token audience
+    tokenIssuer: "", // Token issuer
 });
 ```
 
