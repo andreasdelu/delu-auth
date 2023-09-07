@@ -5,6 +5,15 @@ const jwt = require("jsonwebtoken");
 let JWT_SECRET = null;
 
 let CONFIG = {
+	passwordRequirements: {
+		enabled: false,
+		minLength: 8,
+		maxLength: 32,
+		requireUppercase: true,
+		requireLowercase: true,
+		requireNumbers: true,
+		requireSpecialCharacters: true,
+	},
 	passwordSaltRounds: 10,
 	tokenExpiration: 8 * 60 * 60,
 	tokenAudience: "",
@@ -15,14 +24,25 @@ let CONFIG = {
 /**
  * Initializes the auth module
  * @param {string} jwtSecret - String
- * @param {string} sha256Key - String
  * @param {object} config - Object
  * @returns true if successful
  * @example
  * //Default config
  * const config = {
- *      tokenExpiration: 8 * 60 * 60, //8 hours in seconds
- *      passwordSaltRounds: 10,
+ * 	tokenExpiration: 8 * 60 * 60, // 8 hours in seconds
+ * 	passwordSaltRounds: 10, // bcrypt salt rounds
+ * 	tokenAudience: "", // JWT audience
+ * 	tokenIssuer: "", // JWT issuer
+ * 	tokenCookieName: "token", // Name of the cookie to store the JWT
+ * 	passwordRequirements: { // Password requirements
+ * 		enabled: false, // Enable password requirements
+ * 		minLength: 8, // Minimum length
+ * 		maxLength: 32, // Maximum length
+ * 		requireUppercase: true, // Require uppercase letters
+ * 		requireLowercase: true, // Require lowercase letters
+ * 		requireNumbers: true, // Require numbers
+ * 		requireSpecialCharacters: true, // Require special characters
+ * 	},
  * };
  */
 function init(jwtSecret, config) {
@@ -69,6 +89,61 @@ function init(jwtSecret, config) {
 			}
 			CONFIG.tokenCookieName = config.tokenCookieName;
 		}
+		if (config?.passwordRequirements?.enabled) {
+			if (typeof config.passwordRequirements.enabled !== "boolean") {
+				throw new Error("Invalid passwordRequirements.enabled");
+			}
+
+			CONFIG.passwordRequirements.enabled = config.passwordRequirements.enabled;
+
+			if (config?.passwordRequirements?.minLength) {
+				if (typeof config.passwordRequirements.minLength !== "number") {
+					throw new Error("Invalid passwordRequirements.minLength");
+				}
+				CONFIG.passwordRequirements.minLength =
+					config.passwordRequirements.minLength;
+			}
+			if (config?.passwordRequirements?.maxLength) {
+				if (typeof config.passwordRequirements.maxLength !== "number") {
+					throw new Error("Invalid passwordRequirements.maxLength");
+				}
+				CONFIG.passwordRequirements.maxLength =
+					config.passwordRequirements.maxLength;
+			}
+			if (config?.passwordRequirements?.requireUppercase) {
+				if (typeof config.passwordRequirements.requireUppercase !== "boolean") {
+					throw new Error("Invalid passwordRequirements.requireUppercase");
+				}
+				CONFIG.passwordRequirements.requireUppercase =
+					config.passwordRequirements.requireUppercase;
+			}
+			if (config?.passwordRequirements?.requireLowercase) {
+				if (typeof config.passwordRequirements.requireLowercase !== "boolean") {
+					throw new Error("Invalid passwordRequirements.requireLowercase");
+				}
+				CONFIG.passwordRequirements.requireLowercase =
+					config.passwordRequirements.requireLowercase;
+			}
+			if (config?.passwordRequirements?.requireNumbers) {
+				if (typeof config.passwordRequirements.requireNumbers !== "boolean") {
+					throw new Error("Invalid passwordRequirements.requireNumbers");
+				}
+				CONFIG.passwordRequirements.requireNumbers =
+					config.passwordRequirements.requireNumbers;
+			}
+			if (config?.passwordRequirements?.requireSpecialCharacters) {
+				if (
+					typeof config.passwordRequirements.requireSpecialCharacters !==
+					"boolean"
+				) {
+					throw new Error(
+						"Invalid passwordRequirements.requireSpecialCharacters"
+					);
+				}
+				CONFIG.passwordRequirements.requireSpecialCharacters =
+					config.passwordRequirements.requireSpecialCharacters;
+			}
+		}
 	}
 
 	JWT_SECRET = jwtSecret;
@@ -103,12 +178,41 @@ async function hashPassword(password) {
  * @param {string} password - String
  * @param {string} hashedPassword - String
  * @param {object} tokenContent - Object
+ * @param {object} hooks - Object **Optional**
  * @returns {string} A JWT token
  * @example
- * const token = await authenticate("password", "hashedPassword", { id: 1 });
+ * const token = await authenticate("password", "hashedPassword", { id: 1 }, {
+ * 	beforeAuthenticate: () => {
+ * 		// Do something before authenticating
+ * 		return true; // Return false to abort the authentication process
+ * 	},
+ * 	onSuccess: (token) => {
+ * 		// Do something on success
+ * 	},
+ * 	onFailure: (error) => {
+ * 		// Do something on failure
+ * 	},
+ * );
  */
-async function authenticate(password, hashedPassword, tokenContent) {
+async function authenticate(
+	password,
+	hashedPassword,
+	tokenContent,
+	hooks = {}
+) {
 	try {
+		if (hooks && typeof hooks !== "object") {
+			throw new Error("Invalid hooks");
+		}
+		const { beforeAuthenticate, onSuccess } = hooks;
+		// Before authenticate hook
+		if (beforeAuthenticate && typeof beforeAuthenticate === "function") {
+			const shouldContinue = beforeAuthenticate(); // can return false to abort the authentication process
+			if (typeof shouldContinue === "boolean" && !shouldContinue) {
+				console.log("Authentication aborted by beforeAuthenticate hook");
+				return null;
+			}
+		}
 		if (!password) {
 			throw new Error("Missing password");
 		}
@@ -130,6 +234,7 @@ async function authenticate(password, hashedPassword, tokenContent) {
 		if (typeof password !== "string") {
 			throw new Error("Invalid password");
 		}
+
 		const passwordValid = await bcrypt.compare(password, hashedPassword);
 
 		if (!passwordValid) {
@@ -142,9 +247,19 @@ async function authenticate(password, hashedPassword, tokenContent) {
 			throw new Error("Could not sign JWT");
 		}
 
+		// On success hook
+		if (onSuccess && typeof onSuccess === "function") {
+			onSuccess(sessionToken);
+		}
+
 		return sessionToken;
 	} catch (error) {
 		console.log("COULD NOT AUTHENTICATE: ", error);
+		const { onFailure } = hooks;
+		// On failure hook
+		if (onFailure && typeof onFailure === "function") {
+			onFailure(error);
+		}
 		return null;
 	}
 }
@@ -240,25 +355,40 @@ function verifyJWT(token) {
  * });
  */
 function ensureAuth(req, res, next) {
-	let token;
+	try {
+		let token;
 
-	// Check for token in cookies
-	if (req?.cookies?.[CONFIG.tokenCookieName]) {
-		token = req.cookies[CONFIG.tokenCookieName];
-	}
+		// Check for token in cookies
+		if (req?.cookies?.[CONFIG.tokenCookieName]) {
+			token = req.cookies[CONFIG.tokenCookieName];
+		}
 
-	// Check for Bearer token in Authorization header
-	const authHeader = req.headers.authorization;
-	if (authHeader && authHeader.startsWith("Bearer ")) {
-		token = authHeader.split(" ")[1]; // Extract the token
-	}
+		// Check for Bearer token in Authorization header
+		const authHeader = req.headers.authorization;
+		if (authHeader && authHeader.startsWith("Bearer ")) {
+			token = authHeader.split(" ")[1]; // Extract the token
+		}
 
-	const verified = verifyJWT(token);
-	if (!verified) {
-		return res.status(401).json({ error: "Unauthorized" });
+		if (!token) {
+			return res.status(401).json({ error: "No token found" });
+		}
+
+		const verified = verifyJWT(token);
+		if (!verified) {
+			return res.status(401).json({ error: "Token signature mismatch" });
+		}
+		req.user = verified;
+		next();
+	} catch (error) {
+		console.log("COULD NOT ENSURE AUTH: ", error);
+		return res.status(500).json({ error: error.message });
 	}
-	req.user = verified;
-	next();
+}
+
+function endSession(req, res) {
+	try {
+		res.clearCookie(CONFIG.tokenCookieName);
+	} catch (error) {}
 }
 
 module.exports = {
