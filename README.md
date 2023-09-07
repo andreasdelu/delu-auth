@@ -105,11 +105,21 @@ You can provide additional configuration when initializing:
 
 ```javascript
 auth.init(jwtSecret, {
-	tokenCookieName: "myToken", // Name of the cookie containing the JWT token
-	passwordSaltRounds: 10, // Number of salt rounds used in bcrypt hashing
-	tokenExpiration: 8 * 60 * 60, // Token expiration in seconds
-	tokenAudience: "", // Token audience
-	tokenIssuer: "", // Token issuer
+	tokenExpiration: 8 * 60 * 60, // 8 hours in seconds
+	passwordSaltRounds: 10, // bcrypt salt rounds
+	tokenAudience: "", // JWT audience
+	tokenIssuer: "", // JWT issuer
+	tokenCookieName: "token", // Name of the cookie to store the JWT
+	// Password requirements
+	passwordRequirements: {
+		enabled: false, // Enable password requirements
+		minLength: 8, // Minimum length
+		maxLength: 32, // Maximum length
+		requireUppercase: true, // Require uppercase letters
+		requireLowercase: true, // Require lowercase letters
+		requireNumbers: true, // Require numbers
+		requireSpecialCharacters: true, // Require special characters
+	},
 });
 ```
 
