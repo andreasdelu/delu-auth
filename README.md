@@ -4,6 +4,21 @@
 
 This authentication package provides a set of utilities for handling user authentication in Node.js applications using Express. It includes functions for hashing passwords, verifying passwords, signing JWT tokens, verifying JWT tokens, and middleware to ensure authentication.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Initialization](#initialization)
+- [Generating a JWT Secret](#generating-a-jwt-secret)
+- [Usage](#usage)
+  - [Hashing Passwords](#hashing-passwords)
+  - [Verifying Passwords](#verifying-passwords)
+  - [Authenticating Users](#authenticating-users)
+  - [Authenticating Users with HOOKS](#authenticating-users-with-hooks)
+  - [Verifying JWT Tokens](#verifying-jwt-tokens)
+  - [Middleware for Authentication](#middleware-for-authentication)
+- [Configuration](#configuration)
+- [Conclusion](#conclusion)
+
 ## Installation
 
 ```
@@ -18,7 +33,10 @@ Before using any of the package's functionalities, you need to initialize it:
 const auth = require("delu-auth");
 const jwtSecret = process.env.JWT_SECRET;
 
-auth.init(jwtSecret);
+auth.init({
+	jwtSecret,
+	// Other configuration options
+});
 ```
 
 **Important**: Do not hard-code your JWT secret in your codebase. Always use environment variables or some other form of secure configuration management.
@@ -45,38 +63,57 @@ To hash a password:
 const hashedPassword = await auth.hashPassword("yourPassword");
 ```
 
-### Authenticating Users
+### Verifying Passwords
 
-To authenticate a user and get a JWT token:
+To verify a password:
 
 ```javascript
-const token = await auth.authenticate("password", "hashedPassword", {
-	userId: 123,
+const strongPassword = auth.isStrongPassword("yourPassword");
+```
+
+**Note**: This function only works when password requirements are enabled. See the [configuration section](#configuration) for more information.
+
+### Authenticating Users
+
+To authenticate a user:
+
+```javascript
+app.post("/login", async (req, res) => {
+	const { password } = req.body;
+
+	const hashedPassword = await getHashedPasswordFromDB(); // Get hashed password from database
+
+	const tokenContent = { id: 1 };
+
+	await authenticate(req, res, password, hashedPassword, tokenContent); // returns res.status(200).json({ message: "Authentication successful" });
 });
 ```
 
-### Authenticating Users WITH HOOKS
+### Authenticating Users with HOOKS
 
 To authenticate a user using hooks:
 
 ```javascript
-await auth.authenticate(
-	"password",
-	"hashedPassword",
-	{ userId: 123 },
-	{
+app.post("/login", async (req, res) => {
+	const { password } = req.body;
+
+	const hashedPassword = await getHashedPasswordFromDB(); // Get hashed password from database
+
+	const tokenContent = { id: 1 };
+
+	await authenticate(req, res, password, hashedPassword, tokenContent, {
 		beforeAuthenticate: () => {
 			// Do something before authenticating
 			return true; // Return false to abort the authentication process
 		},
-		onSuccess: (token) => {
-			// Do something on success
+		onSuccess: (token, res) => {
+			// Do something on success (redirect, etc.)
 		},
 		onFailure: (error) => {
 			// Do something on failure
 		},
-	}
-);
+	});
+});
 ```
 
 ### Verifying JWT Tokens
@@ -99,12 +136,24 @@ app.get("/protected", auth.ensureAuth, (req, res) => {
 
 The middleware will check for a token in a cookie (by default named "token") or in the `Authorization` header as a Bearer token.
 
+### Logging Out
+
+To log out a user:
+
+```javascript
+app.post("/logout", auth.logout);
+```
+
+This will clear the token cookie and redirect the user to the `noAuthRedirectPath` which can be set in the [config](#configuration).
+
 ## Configuration
 
 You can provide additional configuration when initializing:
 
 ```javascript
-auth.init(jwtSecret, {
+auth.init({
+	jwtSecret: null, // JWT secret
+	noAuthRedirectPath: "/login", // Default redirect path for the middleware
 	tokenExpiration: 8 * 60 * 60, // 8 hours in seconds
 	passwordSaltRounds: 10, // bcrypt salt rounds
 	tokenAudience: "", // JWT audience
