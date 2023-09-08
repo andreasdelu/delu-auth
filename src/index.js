@@ -1,18 +1,17 @@
 const {
 	authenticate,
-	ensureAuth,
 	init,
 	signJWT,
 	verifyJWT,
 	hashPassword,
 	isStrongPassword,
 	logout,
-} = require("./functions");
-const { generateJWTSecret } = require("./utils");
+} = require("./utils/functions");
+const { generateJWTSecret } = require("./utils/utils");
+const { ensureAuth } = require("./middleware/middleware");
 
 module.exports = {
 	authenticate,
-	ensureAuth,
 	generateJWTSecret,
 	hashPassword,
 	init,
@@ -20,4 +19,5 @@ module.exports = {
 	verifyJWT,
 	isStrongPassword,
 	logout,
+	ensureAuth,
 };
