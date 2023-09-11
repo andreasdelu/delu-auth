@@ -25,7 +25,8 @@
 		"url": "https://github.com/andreasdelu/delu-auth.git"
 	},
 	"files": [
-		"/src"
+		"/src/lib",
+		"/src/index.js"
 	],
 	"devDependencies": {
 		"cookie-parser": "^1.4.6",
