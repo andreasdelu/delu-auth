@@ -16,12 +16,14 @@ This authentication package provides a set of utilities for handling user authen
   - [Authenticating Users with HOOKS](#authenticating-users-with-hooks)
   - [Verifying JWT Tokens](#verifying-jwt-tokens)
   - [Middleware for Authentication](#middleware-for-authentication)
+  - [Middleware for Sessions](#middleware-for-sessions)
 - [Configuration](#configuration)
 - [Conclusion](#conclusion)
+- [Examples](#examples)
 
 ## Installation
 
-```
+```zsh
 npm install delu-auth
 ```
 
@@ -81,11 +83,13 @@ To authenticate a user:
 app.post("/login", async (req, res) => {
 	const { password } = req.body;
 
-	const hashedPassword = await getHashedPasswordFromDB(); // Get hashed password from database
+	// Get hashed password from database
+	const hashedPassword = await getHashedPasswordFromDB();
 
 	const tokenContent = { id: 1 };
 
-	await authenticate(req, res, password, hashedPassword, tokenContent); // returns res.status(200).json({ message: "Authentication successful" });
+	await authenticate(req, res, password, hashedPassword, tokenContent);
+	// returns res.status(200).json({ message: "Authentication successful" });
 });
 ```
 
@@ -97,7 +101,8 @@ To authenticate a user using hooks:
 app.post("/login", async (req, res) => {
 	const { password } = req.body;
 
-	const hashedPassword = await getHashedPasswordFromDB(); // Get hashed password from database
+	// Get hashed password from database
+	const hashedPassword = await getHashedPasswordFromDB();
 
 	const tokenContent = { id: 1 };
 
@@ -136,6 +141,16 @@ app.get("/protected", auth.ensureAuth, (req, res) => {
 
 The middleware will check for a token in a cookie (by default named "token") or in the `Authorization` header as a Bearer token.
 
+### Middleware for Sessions
+
+Check the JWT and set the `user` property on the request object for each request:
+
+```javascript
+app.use(auth.sessionHandler);
+```
+
+This middleware does NOT handle redirecting the user or ensuring authentication. The purpose of this middleware is to have a global middleware that makes sure the `req.user` property is persistent on all routes, even if the route is not protected.
+
 ### Logging Out
 
 To log out a user:
@@ -153,12 +168,17 @@ You can provide additional configuration when initializing:
 ```javascript
 auth.init({
 	jwtSecret: null, // JWT secret
-	noAuthRedirectPath: "/login", // Default redirect path for the middleware
-	tokenExpiration: 8 * 60 * 60, // 8 hours in seconds
+	loginRedirectPath: "/login", // Default redirect path for the login route
+	defaultRedirectPath: "/", // Default redirect path for the application
+	tokenExpiration: 28800, // 8 hours (Must be in seconds)
 	passwordSaltRounds: 10, // bcrypt salt rounds
 	tokenAudience: "", // JWT audience
 	tokenIssuer: "", // JWT issuer
 	tokenCookieName: "token", // Name of the cookie to store the JWT
+	customTokenBlacklisting: true, // How to handle token invalidation.
+	//True(default): User handles blacklisting with custom code.
+	//False: Invalidation is handled in the package. (WARNING This method might be the simplest but is not recommended for larger applications as the blacklisted tokens are stored in-memory)
+
 	// Password requirements
 	passwordRequirements: {
 		enabled: false, // Enable password requirements
@@ -175,3 +195,8 @@ auth.init({
 ## Conclusion
 
 This package aims to simplify authentication processes in Node.js applications. If you have any issues or suggestions, please open an issue on our GitHub repository.
+
+## Examples
+
+Check out the example repo to see the package implemented:
+COMING SOON
