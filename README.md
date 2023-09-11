@@ -199,4 +199,5 @@ This package aims to simplify authentication processes in Node.js applications. 
 ## Examples
 
 Check out the example repo to see the package implemented:
-COMING SOON
+
+https://github.com/andreasdelu/delu-auth-example
