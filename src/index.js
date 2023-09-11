@@ -6,9 +6,10 @@ const {
 	hashPassword,
 	isStrongPassword,
 	logout,
-} = require("./utils/functions");
-const { generateJWTSecret } = require("./utils/utils");
-const { ensureAuth } = require("./middleware/middleware");
+	ensureAuth,
+	sessionHandler,
+} = require("./lib/functions");
+const { generateJWTSecret } = require("./lib/utils");
 
 module.exports = {
 	authenticate,
@@ -20,4 +21,5 @@ module.exports = {
 	isStrongPassword,
 	logout,
 	ensureAuth,
+	sessionHandler,
 };
