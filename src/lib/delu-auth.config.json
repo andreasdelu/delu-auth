@@ -1,0 +1,20 @@
+{
+	"jwtSecret": null,
+	"loginRedirectPath": "/login",
+	"defaultRedirectPath": "/",
+	"passwordRequirements": {
+		"enabled": false,
+		"minLength": 8,
+		"maxLength": 32,
+		"requireUppercase": true,
+		"requireLowercase": true,
+		"requireNumbers": true,
+		"requireSpecialCharacters": true
+	},
+	"passwordSaltRounds": 10,
+	"tokenExpiration": 28800,
+	"tokenAudience": "",
+	"tokenIssuer": "",
+	"tokenCookieName": "token",
+	"customTokenBlacklisting": true
+}
